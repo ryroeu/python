@@ -1,4 +1,44 @@
-# You will need to install the kaggle library first: pip install kaggle
+import subprocess
+import sys
+import importlib.util
+
+def check_and_install_dependencies():
+    """
+    Checks if required modules are installed and installs them if they are not.
+    """
+    # A dictionary mapping the import name to the package name for pip
+    packages = {
+        'kaggle': 'kaggle',
+        'pandas': 'pandas',
+        'numpy': 'numpy',
+        'tensorflow': 'tensorflow',
+        'sklearn': 'scikit-learn'  # Note: the import is 'sklearn', but the package is 'scikit-learn'
+    }
+
+    print("Checking for required Python modules...")
+    all_installed = True
+    for import_name, package_name in packages.items():
+        spec = importlib.util.find_spec(import_name)
+        if spec is None:
+            all_installed = False
+            print(f"⚠️ Module '{import_name}' not found. Attempting to install '{package_name}'...")
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+                print(f"✅ Successfully installed '{package_name}'.")
+            except subprocess.CalledProcessError as e:
+                print(f"❌ ERROR: Failed to install '{package_name}'. Please install it manually using 'pip install {package_name}'")
+                sys.exit(1) # Exit the script if a crucial dependency fails to install
+
+    if all_installed:
+        print("👍 All required modules are installed.")
+    print("-" * 30)
+
+
+# Run the dependency check at the very beginning
+check_and_install_dependencies()
+
+
+# Now, import the libraries for the rest of the script
 import kaggle
 import os
 import shutil
@@ -69,10 +109,8 @@ def preprocess_data(filename):
     """Loads and preprocesses the EuroDreams lottery data from the CSV file."""
     df = pd.read_csv(filename)
     
-    # --- THIS SECTION IS NOW CORRECTED BASED ON YOUR SCREENSHOT ---
     main_ball_cols = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Number 6']
     dream_num_col = ['Dream Number']
-    # -------------------------------------------------------------
     
     balls = df[main_ball_cols].values
     dream_numbers = df[dream_num_col].values

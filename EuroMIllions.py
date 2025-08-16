@@ -1,3 +1,44 @@
+import subprocess
+import sys
+import importlib.util
+
+def check_and_install_dependencies():
+    """
+    Checks if required modules are installed and installs them if they are not.
+    """
+    # A dictionary mapping the import name to the package name for pip
+    packages = {
+        'requests': 'requests',
+        'pandas': 'pandas',
+        'numpy': 'numpy',
+        'tensorflow': 'tensorflow',
+        'sklearn': 'scikit-learn'
+    }
+
+    print("Checking for required Python modules...")
+    all_installed = True
+    for import_name, package_name in packages.items():
+        spec = importlib.util.find_spec(import_name)
+        if spec is None:
+            all_installed = False
+            print(f"⚠️ Module '{import_name}' not found. Attempting to install '{package_name}'...")
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+                print(f"✅ Successfully installed '{package_name}'.")
+            except subprocess.CalledProcessError as e:
+                print(f"❌ ERROR: Failed to install '{package_name}'. Please install it manually using 'pip install {package_name}'")
+                sys.exit(1)
+
+    if all_installed:
+        print("👍 All required modules are installed.")
+    print("-" * 30)
+
+
+# Run the dependency check at the very beginning
+check_and_install_dependencies()
+
+
+# Now, import the libraries for the rest of the script
 import requests
 import pandas as pd
 import numpy as np
@@ -53,8 +94,6 @@ def preprocess_data(filename):
     balls = df[['Ball 1', 'Ball 2', 'Ball 3', 'Ball 4', 'Ball 5']].values
     lucky_stars = df[['Lucky Star 1', 'Lucky Star 2']].values
     
-    # **KEY IMPROVEMENT**: Scale balls and lucky stars separately
-    # Main balls are 1-50, Lucky Stars are 1-12. Scaling them together is bad practice.
     scaler_balls = MinMaxScaler(feature_range=(0, 1))
     scaler_stars = MinMaxScaler(feature_range=(0, 1))
 
@@ -80,7 +119,7 @@ def build_and_train_model(X_train, y_train):
     print("\nBuilding LSTM model...")
     model = Sequential([
         Input(shape=(X_train.shape[1], X_train.shape[2])),
-        LSTM(100, activation='relu', return_sequences=True), # Added a second LSTM layer
+        LSTM(100, activation='relu', return_sequences=True),
         Dropout(0.2),
         LSTM(50, activation='relu'),
         Dropout(0.2),
@@ -138,10 +177,10 @@ def main():
     
     predicted_numbers = make_prediction(model, draws_scaled, scaler_balls, scaler_stars)
     
-    print("\n---" * 10)
+    print("\n" + "---" * 10)
     print("🔮 DISCLAIMER: This is for educational purposes only. Lottery numbers are random.")
     print("The predicted numbers have the same chance of winning as any other combination.")
-    print("---\n" * 1)
+    print("---" * 10 + "\n")
     
     # Sort the numbers first
     predicted_main_balls = sorted(predicted_numbers[:5])
@@ -153,7 +192,7 @@ def main():
     
     print(f"Predicted Main Balls: {main_balls_str}")
     print(f"Predicted Lucky Stars: {lucky_stars_str}")
-    print("\n---" * 10)
+    print("\n" + "---" * 10)
 
 if __name__ == "__main__":
     main()
