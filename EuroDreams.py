@@ -1,93 +1,81 @@
-import requests
+# You will need to install the kaggle library first: pip install kaggle
+import kaggle
+import os
+import shutil
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-from bs4 import BeautifulSoup
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Input, Dense, LSTM, Dropout
 from sklearn.preprocessing import MinMaxScaler
-import os
 
 # -------------------------
 # Configuration
 # -------------------------
 CONFIG = {
-    "results_url": "https://eu-dreams.com/results/2025",
-    "csv_filename": "eurodreams.csv",
-    "seq_length": 50,  # Number of past draws to use for prediction
+    "kaggle_dataset": "eduardosilva46/eurodreams",
+    "kaggle_filename": "Eurodreams From 2023-11-06.csv",
+    "csv_filename": "eurodreams.csv", # The name we want the file to have locally
+    "seq_length": 50,
     "epochs": 50,
     "batch_size": 16,
 }
 
 # -------------------------
-# Part 1: Data Acquisition (Web Scraping)
+# Part 1: Data Acquisition (Kaggle API)
 # -------------------------
-def fetch_and_save_results(url, filename):
+def download_from_kaggle(dataset, kaggle_file, local_file):
     """
-    Scrapes EuroDreams results from a URL, formats them, and saves to a CSV file.
+    Downloads a specific file from a Kaggle dataset and renames it.
+    (Handles URL-encoded spaces in filenames)
     """
-    print(f"🌎 Scraping winning numbers from {url}...")
+    print(f"📥 Downloading '{kaggle_file}' from Kaggle dataset '{dataset}'...")
     try:
-        response = requests.get(url)
-        response.raise_for_status() # Raise an error if the page can't be downloaded
+        # Download the file to the current directory
+        kaggle.api.dataset_download_file(dataset, file_name=kaggle_file, path='.', force=True)
+        print("✅ Download complete.")
 
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        drawings_data = []
+        # Create the filename variant with URL-encoded spaces (%20)
+        encoded_filename = kaggle_file.replace(' ', '%20')
 
-        # Find all the containers that hold a single draw's results
-        result_sets = soup.find_all('div', class_='results-ball-set')
-
-        if not result_sets:
-            print("❌ ERROR: Could not find any results on the page.")
-            print("The website's HTML structure may have changed.")
+        # Check if the downloaded file exists with the encoded name
+        if os.path.exists(encoded_filename):
+            print(f"Found downloaded file: '{encoded_filename}'")
+            # Rename the file to our desired local filename
+            shutil.move(encoded_filename, local_file)
+            print(f"✏️ Renamed '{encoded_filename}' to '{local_file}'.")
+            return True
+        # As a fallback, check for the original name (in case the API behavior changes)
+        elif os.path.exists(kaggle_file):
+            print(f"Found downloaded file: '{kaggle_file}'")
+            shutil.move(kaggle_file, local_file)
+            print(f"✏️ Renamed '{kaggle_file}' to '{local_file}'.")
+            return True
+        else:
+            print(f"❌ ERROR: Expected file was not found after download.")
+            print(f"   Checked for '{kaggle_file}' and '{encoded_filename}'.")
             return False
 
-        for result_set in result_sets:
-            # Within each result set, find the main balls and the dream number
-            main_balls = [int(b.text) for b in result_set.find_all('div', class_='result-ball')]
-            dream_number = int(result_set.find('div', class_='result-lucky-star').text)
-            
-            if len(main_balls) == 6 and dream_number is not None:
-                full_drawing = main_balls + [dream_number]
-                drawings_data.append(full_drawing)
-
-        # Create a pandas DataFrame from the scraped data
-        column_names = ['boule_1', 'boule_2', 'boule_3', 'boule_4', 'boule_5', 'boule_6', 'n_dream']
-        df = pd.DataFrame(drawings_data, columns=column_names)
-
-        # Reverse the order to have the oldest data first for time-series analysis
-        df = df.iloc[::-1]
-
-        df.to_csv(filename, index=False)
-        print(f"✅ Successfully saved {len(drawings_data)} drawings to '{filename}'")
-        return True
-
-    except requests.exceptions.RequestException as e:
-        print(f"❌ ERROR: Could not download the webpage. {e}")
-        return False
     except Exception as e:
-        print(f"❌ ERROR: An error occurred during scraping. {e}")
+        print(f"❌ ERROR: Failed to download from Kaggle. Please check your setup.")
+        print(f"   Ensure 'kaggle.json' is in the correct folder (~/.kaggle/ or C:\\Users\\<user>\\.kaggle)")
+        print(f"   Kaggle API error: {e}")
         return False
 
 # -------------------------
 # Part 2: Data Processing
 # -------------------------
 def preprocess_data(filename):
-    """Loads and preprocesses the EuroDreams lottery data."""
+    """Loads and preprocesses the EuroDreams lottery data from the CSV file."""
+    # Kaggle CSV uses different column names, so we adapt here
     df = pd.read_csv(filename)
     
-    try:
-        main_ball_cols = ['boule_1', 'boule_2', 'boule_3', 'boule_4', 'boule_5', 'boule_6']
-        dream_num_col = ['n_dream']
-        
-        balls = df[main_ball_cols].values
-        dream_numbers = df[dream_num_col].values
-    except KeyError as e:
-        print(f"❌ ERROR: A column name was not found in the CSV: {e}")
-        return None, None, None, None, None
+    main_ball_cols = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6']
+    dream_num_col = ['Dream']
+    
+    balls = df[main_ball_cols].values
+    dream_numbers = df[dream_num_col].values
 
-    # EuroDreams: 6 balls (1-40), 1 Dream Number (1-5).
     scaler_balls = MinMaxScaler(feature_range=(0, 1))
     scaler_dream = MinMaxScaler(feature_range=(0, 1))
 
@@ -115,10 +103,9 @@ def build_and_train_model(X_train, y_train):
         Dropout(0.2),
         LSTM(50, activation='relu'),
         Dropout(0.2),
-        Dense(X_train.shape[2]) # Output layer with 7 neurons (6 balls + 1 dream number)
+        Dense(X_train.shape[2])
     ])
     model.compile(optimizer='adam', loss='mse')
-    print("Model Summary:")
     model.summary()
 
     print("\nTraining the model...")
@@ -150,17 +137,15 @@ def make_prediction(model, data_scaled, scaler_balls, scaler_dream):
 # -------------------------
 def main():
     """Main function to run the script."""
-    if not fetch_and_save_results(CONFIG["results_url"], CONFIG["csv_filename"]):
-        return # Exit if scraping fails
+    if not download_from_kaggle(CONFIG["kaggle_dataset"], CONFIG["kaggle_filename"], CONFIG["csv_filename"]):
+        return # Exit if data acquisition fails
         
     processed_data = preprocess_data(CONFIG["csv_filename"])
-    if processed_data[0] is None:
-        return
-
+    
     X, y, draws_scaled, scaler_balls, scaler_dream = processed_data
     
     if len(X) == 0:
-        print("Not enough data to create sequences. Try a smaller 'seq_length' or a different URL.")
+        print("Not enough data to create sequences. Try a smaller 'seq_length'.")
         return
         
     model = build_and_train_model(X, y)
