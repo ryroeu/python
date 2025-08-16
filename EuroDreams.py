@@ -67,11 +67,12 @@ def download_from_kaggle(dataset, kaggle_file, local_file):
 # -------------------------
 def preprocess_data(filename):
     """Loads and preprocesses the EuroDreams lottery data from the CSV file."""
-    # Kaggle CSV uses different column names, so we adapt here
     df = pd.read_csv(filename)
     
-    main_ball_cols = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6']
-    dream_num_col = ['Dream']
+    # --- THIS SECTION IS NOW CORRECTED BASED ON YOUR SCREENSHOT ---
+    main_ball_cols = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Number 6']
+    dream_num_col = ['Dream Number']
+    # -------------------------------------------------------------
     
     balls = df[main_ball_cols].values
     dream_numbers = df[dream_num_col].values
