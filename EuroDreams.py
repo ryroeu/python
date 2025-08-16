@@ -133,4 +133,53 @@ def build_and_train_model(X_train, y_train):
 # -------------------------
 # Part 4: Prediction
 # -------------------------
-def make
+def make_prediction(model, data_scaled, scaler_balls, scaler_dream):
+    """Makes a prediction for the next draw."""
+    last_sequence = np.expand_dims(data_scaled[-CONFIG["seq_length"]:], axis=0)
+    
+    predicted_scaled = model.predict(last_sequence)
+    
+    predicted_balls = scaler_balls.inverse_transform(predicted_scaled[:, :6])
+    predicted_dream = scaler_dream.inverse_transform(predicted_scaled[:, 6:])
+    
+    predicted_draw = np.concatenate((predicted_balls, predicted_dream), axis=1)
+    return np.round(predicted_draw).astype(int)[0]
+
+# -------------------------
+# Main Execution
+# -------------------------
+def main():
+    """Main function to run the script."""
+    if not fetch_and_save_results(CONFIG["results_url"], CONFIG["csv_filename"]):
+        return # Exit if scraping fails
+        
+    processed_data = preprocess_data(CONFIG["csv_filename"])
+    if processed_data[0] is None:
+        return
+
+    X, y, draws_scaled, scaler_balls, scaler_dream = processed_data
+    
+    if len(X) == 0:
+        print("Not enough data to create sequences. Try a smaller 'seq_length' or a different URL.")
+        return
+        
+    model = build_and_train_model(X, y)
+    
+    predicted_numbers = make_prediction(model, draws_scaled, scaler_balls, scaler_dream)
+    
+    print("\n" + "---" * 10)
+    print("🔮 DISCLAIMER: This is for educational purposes only. Lottery numbers are random.")
+    print("The predicted numbers have the same chance of winning as any other combination.")
+    print("---" * 10 + "\n")
+    
+    predicted_main_balls = sorted(predicted_numbers[:6])
+    predicted_dream_num = predicted_numbers[6]
+    
+    main_balls_str = ", ".join(map(str, predicted_main_balls))
+    
+    print(f"Predicted Main Balls: {main_balls_str}")
+    print(f"Predicted Dream Number: {predicted_dream_num}")
+    print("\n" + "---" * 10)
+
+if __name__ == "__main__":
+    main()
